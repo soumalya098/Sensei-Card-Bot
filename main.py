@@ -43,7 +43,8 @@ def append_generated_pans(new_pans):
     try:
         with open(GENERATED_PANS_FILE, "a") as fh:
             for pan in new_pans:
-                fh.write(str(pan) + "\n")
+                fh.write(str(pan) + "
+")
     except Exception:
         # ignore write errors to avoid crashing; duplicates might happen across restarts if not persisted
         pass
@@ -134,7 +135,8 @@ def generate_to_file(count, prefix=None, total_length=16, luhn=True):
             year = str(random.randint(2025, 2035))
             cvv_len = 4 if total_length == 15 else 3
             cvv = str(random.randint(0, (10 ** cvv_len) - 1)).zfill(cvv_len)
-            line = f"{pan}|{month}|{year}|{cvv}\n"
+            line = f"{pan}|{month}|{year}|{cvv}
+"
             f.write(line)
             generated.append(pan)
     # already appended within generate_luhn_pan_from_prefix, so no need to append here
@@ -153,33 +155,59 @@ def join_channel_markup():
     return markup
 
 WELCOME_TEXT = (
-    "💎 <b>Welcome to Sensei Premium CC Generator Bot 💳</b>\n\n"
-    "This bot generates <b>Luhn-valid</b> dummy cards for testing & study purposes only.\n\n"
-    "🔥 <b>Features:</b>\n"
-    "• Full-card generation (Luhn applied and uniqueness enforced)\n"
-    "• BIN-based full cards (Luhn applied)\n"
-    "• Random 6-digit dummy BINs (no PAN when using /randbin)\n"
-    "• Amex (15-digit) supported\n\n"
-    "📖 <b>Example:</b>\n"
-    "/gen 10             - generate 10 Luhn-valid full cards\n"
-    "/gen 10 4539        - generate 10 Luhn-valid cards starting with 4539\n"
-    "/genbin 100 453968  - generate 100 cards starting with BIN 453968 (Luhn applied)\n"
-    "/randbin 500 45     - 500 dummy 6-digit BINs starting with 45\n\n"
+    "💎 <b>Welcome to Sensei Premium CC Generator Bot 💳</b>
+
+"
+    "This bot generates <b>Luhn-valid</b> dummy cards for testing & study purposes only.
+
+"
+    "🔥 <b>Features:</b>
+"
+    "• Full-card generation (Luhn applied and uniqueness enforced)
+"
+    "• BIN-based full cards (Luhn applied)
+"
+    "• Random 6-digit dummy BINs (no PAN when using /randbin)
+"
+    "• Amex (15-digit) supported
+
+"
+    "📖 <b>Example:</b>
+"
+    "/gen 10             - generate 10 Luhn-valid full cards
+"
+    "/gen 10 4539        - generate 10 Luhn-valid cards starting with 4539
+"
+    "/genbin 100 453968  - generate 100 cards starting with BIN 453968 (Luhn applied)
+"
+    "/randbin 500 45     - 500 dummy 6-digit BINs starting with 45
+
+"
     f"{SIGNATURE}"
 )
 
 HELP_TEXT = (
-    "🧠 <b>Commands Guide:</b>\n\n"
-    "/gen &lt;count&gt; [prefix]       - Generate full Luhn-valid cards (prefix optional)\n"
-    "/genbin &lt;count&gt; &lt;bin&gt;   - Generate full Luhn-valid cards from BIN (6+ digits)\n"
-    "/randbin &lt;count&gt; [prefix]    - Generate dummy 6-digit BINs (prefix optional)\n"
-    "/about - About the bot\n\n"
+    "🧠 <b>Commands Guide:</b>
+
+"
+    "/gen &lt;count&gt; [prefix]       - Generate full Luhn-valid cards (prefix optional)
+"
+    "/genbin &lt;count&gt; &lt;bin&gt;   - Generate full Luhn-valid cards from BIN (6+ digits)
+"
+    "/randbin &lt;count&gt; [prefix]    - Generate dummy 6-digit BINs (prefix optional)
+"
+    "/about - About the bot
+
+"
     "⚙️ Large outputs are sent as .txt file. All generated PANs are stored to avoid repeats."
 )
 
 ABOUT_TEXT = (
-    f"👑 <b>Owner:</b> {OWNER_HANDLE}\n"
-    f"💬 <b>Channel:</b> {CHANNEL_USERNAME}\n\n"
+    f"👑 <b>Owner:</b> {OWNER_HANDLE}
+"
+    f"💬 <b>Channel:</b> {CHANNEL_USERNAME}
+
+"
     f"{SIGNATURE}"
 )
 
@@ -208,8 +236,7 @@ def gen_cmd(message):
         for p in parts[2:]:
             if p and any(ch.isdigit() for ch in p):
                 prefix = p
-
-break
+                break
     # determine card length (Amex)
     total_length = 15 if prefix and (str(prefix).startswith("34") or str(prefix).startswith("37")) else 16
     if count > MAX_SAFE_GENERATE:
@@ -227,9 +254,11 @@ break
                 lines.append(f"{pan}|{month}|{year}|{cvv}")
         except RuntimeError as e:
             return bot.reply_to(message, f"⚠️ Error generating unique cards: {e}")
-        text = "\n".join(lines)
+        text = "
+".join(lines)
         if len(text) > AUTOTRIM_LENGTH:
-            text = text[:AUTOTRIM_LENGTH] + "\n...output trimmed..."
+            text = text[:AUTOTRIM_LENGTH] + "
+...output trimmed..."
         bot.reply_to(message, f"<code>{text}</code>")
     else:
         try:
@@ -237,7 +266,8 @@ break
         except RuntimeError as e:
             return bot.reply_to(message, f"⚠️ Error generating unique cards: {e}")
         with open(path, "rb") as f:
-            bot.send_document(message.chat.id, f, caption=f"Here are {count} generated Luhn-valid cards.\n{SIGNATURE}")
+            bot.send_document(message.chat.id, f, caption=f"Here are {count} generated Luhn-valid cards.
+{SIGNATURE}")
         os.remove(path)
 
 @bot.message_handler(commands=["genbin"])
@@ -266,7 +296,8 @@ def genbin_cmd(message):
                 cards.append(f"{pan}|{month}|{year}|{cvv}")
         except RuntimeError as e:
             return bot.reply_to(message, f"⚠️ Error generating unique cards: {e}")
-        bot.reply_to(message, f"<code>{'\n'.join(cards[:500])}</code>")
+        bot.reply_to(message, f"<code>{'
+'.join(cards[:500])}</code>")
     else:
         # large file generation
         try:
@@ -274,7 +305,8 @@ def genbin_cmd(message):
         except RuntimeError as e:
             return bot.reply_to(message, f"⚠️ Error generating unique cards: {e}")
         with open(path, "rb") as f:
-            bot.send_document(message.chat.id, f, caption=f"BIN {bin_prefix} Luhn-valid dump ({count}).\n{SIGNATURE}")
+            bot.send_document(message.chat.id, f, caption=f"BIN {bin_prefix} Luhn-valid dump ({count}).
+{SIGNATURE}")
         os.remove(path)
 
 @bot.message_handler(commands=["randbin"])
@@ -296,9 +328,10 @@ def randbin_cmd(message):
         return base
 
     bins = [make_random_bin(prefix) for _ in range(count)]
-    result = "\n".join(bins[:500])
+    result = "
+".join(bins[:500])
 
-if count <= INLINE_CHAT_THRESHOLD:
+    if count <= INLINE_CHAT_THRESHOLD:
         bot.reply_to(message, f"<code>{result}</code>")
     else:
         fd, path = tempfile.mkstemp(prefix="bins_", suffix=".txt")
@@ -306,7 +339,8 @@ if count <= INLINE_CHAT_THRESHOLD:
         with open(path, "w") as f:
             f.write(result)
         with open(path, "rb") as f:
-            bot.send_document(message.chat.id, f, caption=f"Here are {count} dummy BINs.\n{SIGNATURE}")
+            bot.send_document(message.chat.id, f, caption=f"Here are {count} dummy BINs.
+{SIGNATURE}")
         os.remove(path)
 
 @bot.callback_query_handler(func=lambda call: True)
