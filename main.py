@@ -7,7 +7,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 # -------------------------
 # Configuration
 # -------------------------
-TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TOKEN = "8324251184:AAHd7hYfRvw-63nlwWnn9d3siJjlwzhTAMk"
 CHANNEL_USERNAME = "@XSENSE_I"
 OWNER_HANDLE = "@PyL1nx"
 SIGNATURE = "🔹 Bot by @PyL1nx | Powered by Sensei 💖"
@@ -16,6 +16,7 @@ INLINE_CHAT_THRESHOLD = 500
 MAX_SAFE_GENERATE = 200000
 AUTOTRIM_LENGTH = 3800
 
+# Persistent file to store already-generated PANs (to prevent repeats)
 GENERATED_PANS_FILE = "generated_pans.txt"
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
@@ -33,17 +34,21 @@ def load_generated_pans():
                     if p:
                         pans.add(p)
         except Exception:
+            # if file read fails, just return empty set (we don't crash bot)
             return set()
     return pans
 
 def append_generated_pans(new_pans):
+    # write newline-separated PANs (digits only) to the file, append mode
     try:
         with open(GENERATED_PANS_FILE, "a") as fh:
             for pan in new_pans:
                 fh.write(str(pan) + "\n")
     except Exception:
+        # ignore write errors to avoid crashing; duplicates might happen across restarts if not persisted
         pass
 
+# load once at startup
 GENERATED_PANS = load_generated_pans()
 
 # -------------------------
@@ -66,32 +71,48 @@ def calc_luhn_check_digit(partial):
     return str((10 - checksum % 10) % 10)
 
 def generate_luhn_pan_from_prefix(prefix, total_length=16, max_attempts=2000):
+    """
+    Generate a Luhn-valid PAN starting with 'prefix' (string of digits).
+    Ensures uniqueness against GENERATED_PANS. Retries until unique or max_attempts reached.
+    """
     prefix = ''.join(ch for ch in str(prefix) if ch.isdigit())
     if not prefix:
+        # if empty prefix, start with common IIN first digit (3/4/5) to emulate cards
         prefix = str(random.choice([3, 4, 5]))
+    # ensure prefix length < total_length
     if len(prefix) >= total_length:
+        # If prefix already equals or longer than total_length, truncate to total_length-1
         prefix = prefix[: total_length - 1]
 
     attempts = 0
     while attempts < max_attempts:
         attempts += 1
         base = prefix
+        # fill up to total_length - 1 digits (leave last for check digit)
         while len(base) < total_length - 1:
             base += str(random.randint(0, 9))
         check = calc_luhn_check_digit(base)
         pan = base + check
         if pan not in GENERATED_PANS:
+            # found unique pan
             GENERATED_PANS.add(pan)
             append_generated_pans([pan])
             return pan
+        # otherwise try again (slightly randomize prefix extension next loop)
+        # small random tweak: if prefix shorter, randomize one digit in the non-prefix part
+        # loop will refill base anew
+    # if we couldn't find unique pan in many attempts, raise
     raise RuntimeError("Could not generate a unique PAN after many attempts. Reduce count or clear history.")
 
 def generate_unique_luhn_pan_any(total_length=16, max_attempts=2000):
+    """Generate unique PAN with random starting digit (3/4/5)"""
     return generate_luhn_pan_from_prefix(str(random.choice([3, 4, 5])), total_length, max_attempts=max_attempts)
 
+# For compatibility with previous functions naming
 def generate_luhn_card_from_bin(bin_prefix, total_length=16):
     return generate_luhn_pan_from_prefix(bin_prefix, total_length)
 
+# fallback random pan generator (shouldn't be used for full-cards now since Luhn is mandatory)
 def random_card_pan(prefix=None, total_length=16):
     if prefix:
         pan = str(prefix)
@@ -107,7 +128,8 @@ def generate_to_file(count, prefix=None, total_length=16, luhn=True):
     generated = []
     with open(path, "w") as f:
         for _ in range(count):
-            pan = generate_luhn_pan_from_prefix(prefix if prefix else str(random.choice([4, 5, 3])), total_length)
+            # Luhn mandatory for full card generation
+            pan = generate_luhn_pan_from_prefix(prefix if prefix else str(random.choice([4,5,3])), total_length)
             month = str(random.randint(1, 12)).zfill(2)
             year = str(random.randint(2025, 2035))
             cvv_len = 4 if total_length == 15 else 3
@@ -115,6 +137,7 @@ def generate_to_file(count, prefix=None, total_length=16, luhn=True):
             line = f"{pan}|{month}|{year}|{cvv}\n"
             f.write(line)
             generated.append(pan)
+    # already appended within generate_luhn_pan_from_prefix, so no need to append here
     return path
 
 # -------------------------
@@ -163,7 +186,6 @@ ABOUT_TEXT = (
 # -------------------------
 # Command Handlers
 # -------------------------
-
 @bot.message_handler(commands=["start", "help"])
 def start(message):
     bot.send_message(message.chat.id, WELCOME_TEXT, reply_markup=join_channel_markup())
@@ -175,24 +197,29 @@ def about(message):
 @bot.message_handler(commands=["gen"])
 def gen_cmd(message):
     parts = message.text.split()
+    # parse count
     try:
         count = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
     except Exception:
         return bot.reply_to(message, "Usage: /gen <count> [prefix]")
     prefix = None
     if len(parts) > 2:
+        # take first non-empty token as prefix (digits)
         for p in parts[2:]:
             if p and any(ch.isdigit() for ch in p):
                 prefix = p
-                break
+
+break
+    # determine card length (Amex)
     total_length = 15 if prefix and (str(prefix).startswith("34") or str(prefix).startswith("37")) else 16
     if count > MAX_SAFE_GENERATE:
         return bot.reply_to(message, "⚠️ Max limit exceeded.")
+    # generate Luhn-valid unique cards (always Luhn now)
     if count <= INLINE_CHAT_THRESHOLD:
         lines = []
         try:
             for _ in range(count):
-                pan = generate_luhn_pan_from_prefix(prefix if prefix else str(random.choice([4, 5, 3])), total_length)
+                pan = generate_luhn_pan_from_prefix(prefix if prefix else str(random.choice([4,5,3])), total_length)
                 month = str(random.randint(1, 12)).zfill(2)
                 year = str(random.randint(2025, 2035))
                 cvv_len = 4 if total_length == 15 else 3
@@ -223,6 +250,7 @@ def genbin_cmd(message):
     except ValueError:
         return bot.reply_to(message, "Usage: /genbin <count> <bin>")
     bin_prefix = parts[2]
+    # Determine Amex/length
     total_length = 15 if str(bin_prefix).startswith(("34", "37")) else 16
     if count > MAX_SAFE_GENERATE:
         return bot.reply_to(message, "⚠️ Max limit exceeded.")
@@ -240,6 +268,7 @@ def genbin_cmd(message):
             return bot.reply_to(message, f"⚠️ Error generating unique cards: {e}")
         bot.reply_to(message, f"<code>{'\n'.join(cards[:500])}</code>")
     else:
+        # large file generation
         try:
             path = generate_to_file(count, bin_prefix, total_length, luhn=True)
         except RuntimeError as e:
@@ -268,7 +297,8 @@ def randbin_cmd(message):
 
     bins = [make_random_bin(prefix) for _ in range(count)]
     result = "\n".join(bins[:500])
-    if count <= INLINE_CHAT_THRESHOLD:
+
+if count <= INLINE_CHAT_THRESHOLD:
         bot.reply_to(message, f"<code>{result}</code>")
     else:
         fd, path = tempfile.mkstemp(prefix="bins_", suffix=".txt")
